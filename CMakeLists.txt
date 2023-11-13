@@ -20,6 +20,12 @@ option(XUNUSED_LINK_CLANG_DYLIB
 
 message(STATUS "Link against the LLVM dynamic library: ${XUNUSED_LINK_LLVM_DYLIB}")
 message(STATUS "Link against the Clang dynamic library: ${XUNUSED_LINK_CLANG_DYLIB}")
+message(STATUS "Use LLVM with built-in assertions: ${LLVM_ENABLE_ASSERTIONS}")
+
+if (NOT LLVM_ENABLE_ASSERTIONS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(WARNING "The output of xunused's debug statistics is not possible. "
+                    "LLVM is built without assertion and debug support!")
+endif (NOT LLVM_ENABLE_ASSERTIONS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${CLANG_INCLUDE_DIRS})

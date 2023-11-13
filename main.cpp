@@ -8,6 +8,8 @@
 #include "clang/Index/USRGeneration.h"
 #include "clang/Tooling/AllTUsExecution.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/Signals.h"
 #include <memory>
 #include <mutex>
@@ -60,6 +62,23 @@ bool getUSRForDecl(const Decl *Decl, std::string &USR) {
   return true;
 }
 
+void printDebug(const std::string &msg) {
+  DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs() << msg << "\n");
+}
+
+void printDebugDecl(const std::string &prefixMsg, const FunctionDecl *decl,
+                      const std::string &suffixMsg) {
+  printDebug(prefixMsg + " " + decl->getNameAsString() + " " + suffixMsg);
+}
+
+void printDebugDecl(const std::string &prefixMsg, const FunctionDecl *decl) {
+  printDebugDecl(prefixMsg + ": ", decl, {});
+}
+
+void printDebugDecl(const FunctionDecl *decl) {
+  printDebugDecl({}, decl, {});
+}
+
 /// Returns all declarations that are not the definition of F
 std::vector<DeclLoc> getDeclarations(const FunctionDecl *F,
                                      const SourceManager &SM) {
@@ -90,7 +109,7 @@ public:
       std::string USR;
       if (!getUSRForDecl(F, USR))
         continue;
-      // llvm::errs() << "UnusedDefs: " << USR << "\n";
+      printDebugDecl("UnusedDefs", F);
       auto it_inserted = AllDecls.emplace(std::move(USR), DefInfo{F, 0});
       if (!it_inserted.second) {
         it_inserted.first->second.Definition = F;
@@ -115,19 +134,21 @@ public:
     std::set_difference(Uses.begin(), Uses.end(), Defs.begin(), Defs.end(),
                         std::back_inserter(ExternalUses));
 
-    /*for (auto *F : Uses) {
-        llvm::errs() << "Uses: " << F << " " << F->getNameAsString() << "\n";
+    if (llvm::isCurrentDebugType(DEBUG_TYPE)) {
+      for (auto *F : Uses) {
+          printDebugDecl("Uses", F);
+      }
+      for (auto *F : Defs) {
+          printDebugDecl("Defs", F);
+      }
     }
-    for (auto *F : Defs) {
-        llvm::errs() << "Defs: " << F << " " << F->getNameAsString() << "\n";
-    }*/
 
     for (auto *F : ExternalUses) {
-      // llvm::errs() << "ExternalUses: " << F->getNameAsString() << "\n";
+      printDebugDecl("ExternalUses", F);
       std::string USR;
       if (!getUSRForDecl(F, USR))
         continue;
-      // llvm::errs() << "ExternalUses: " << USR << "\n";
+      printDebugDecl("ExternalUses", F, "USR: " + USR);
       auto it_inserted = AllDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
       if (!it_inserted.second) {
         it_inserted.first->second.Uses++;
@@ -147,12 +168,8 @@ public:
       assert(FD);
     }
 
-#if 0
-    llvm::errs() << "Use ";
-    FD->printName(llvm::errs());
-    //llvm::errs() << " USR:" << USR;
-    llvm::errs() << "\n";
-#endif
+    printDebugDecl(FD);
+
     Uses.insert(FD->getCanonicalDecl());
   }
   void run(const MatchFinder::MatchResult &Result) override {
@@ -185,11 +202,9 @@ public:
 
       if (F->isMain())
         return;
-#if 0
-      llvm::errs() << "FunctionDecl ";
-      F->printName(llvm::errs());
-      llvm::errs() << " USR:" << USR << "\n";
-#endif
+
+      printDebugDecl(F);
+
       Defs.insert(F->getCanonicalDecl());
 
       // __attribute__((constructor())) are always used
