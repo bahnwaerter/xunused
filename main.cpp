@@ -13,9 +13,11 @@
 #include <mutex>
 #include <map>
 
-
 using namespace clang;
 using namespace clang::ast_matchers;
+
+#define DEBUG_TYPE "xunused"
+STATISTIC(NumUnusedFunctions, "The number of unused functions");
 
 template <class T, class Comp, class Alloc, class Predicate>
 void discard_if(std::set<T, Comp, Alloc> &c, Predicate pred) {
@@ -279,6 +281,7 @@ int main(int argc, const char **argv) {
     if (I.Definition && I.Uses == 0) {
       llvm::errs() << I.Filename << ":" << I.Line << ": warning:"
                    << " Function '" << I.Name << "' is unused\n";
+      ++NumUnusedFunctions;
       for (auto &D : I.Declarations) {
         llvm::errs() << D.Filename << ":" << D.Line << ": note:"
                      << " declared here\n";
