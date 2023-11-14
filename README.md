@@ -28,3 +28,23 @@ You can specify the option `-filter` together with a regular expressions. Only f
 expression will be analyzed. You might want to exclude your test's source code to find functions that are only used by tests but not any other code.
 
 If `xunused` complains about missing include files such as `stddef.h`, try adding `-extra-arg=-I/usr/include/clang/17/include` (or similar) to the arguments.
+
+## Debug it
+To further develop xunused or to debug errors, the built-in debug output and statistics can be used.
+Therefore, LLVM must be compiled with enabled assertions as follows.
+```
+cmake -DLLVM_ENABLE_ASSERTIONS=ON ...
+```
+
+Once LLVM is built with enabled assertions, xunused can be built in Debug configuration as follows.
+```
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make
+```
+
+The debug output and statistics of can now be enabled when calling xunused as follows.
+```
+./xunused -debug-only=xunused -stats /path/to/your/project/compile_commands.json
+```

@@ -52,6 +52,32 @@ struct DefInfo {
 std::mutex Mutex;
 std::map<std::string, DefInfo> AllDecls;
 
+class Logger {
+public:
+  static bool isDebugEnabled() {
+    return llvm::isCurrentDebugType(DEBUG_TYPE);
+  }
+
+  static void logDebug(const std::string &msg) {
+    DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs() << msg << "\n");
+  }
+
+  static void logDebugDecl(const std::string &prefixMsg,
+                           const FunctionDecl *decl,
+                           const std::string &suffixMsg) {
+    logDebug(prefixMsg + ": " + decl->getNameAsString() + " " + suffixMsg);
+  }
+
+  static void logDebugDecl(const std::string &prefixMsg,
+                           const FunctionDecl *decl) {
+    logDebugDecl(prefixMsg, decl, {});
+  }
+
+  static void logDebugDecl(const FunctionDecl *decl) {
+    logDebugDecl({}, decl, {});
+  }
+};
+
 bool getUSRForDecl(const Decl *Decl, std::string &USR) {
   llvm::SmallVector<char, 128> Buff;
 
@@ -60,23 +86,6 @@ bool getUSRForDecl(const Decl *Decl, std::string &USR) {
 
   USR = std::string(Buff.data(), Buff.size());
   return true;
-}
-
-void printDebug(const std::string &msg) {
-  DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs() << msg << "\n");
-}
-
-void printDebugDecl(const std::string &prefixMsg, const FunctionDecl *decl,
-                      const std::string &suffixMsg) {
-  printDebug(prefixMsg + " " + decl->getNameAsString() + " " + suffixMsg);
-}
-
-void printDebugDecl(const std::string &prefixMsg, const FunctionDecl *decl) {
-  printDebugDecl(prefixMsg + ": ", decl, {});
-}
-
-void printDebugDecl(const FunctionDecl *decl) {
-  printDebugDecl({}, decl, {});
 }
 
 /// Returns all declarations that are not the definition of F
@@ -109,7 +118,7 @@ public:
       std::string USR;
       if (!getUSRForDecl(F, USR))
         continue;
-      printDebugDecl("UnusedDefs", F);
+      Logger::logDebugDecl("UnusedDefs", F);
       auto it_inserted = AllDecls.emplace(std::move(USR), DefInfo{F, 0});
       if (!it_inserted.second) {
         it_inserted.first->second.Definition = F;
@@ -134,21 +143,21 @@ public:
     std::set_difference(Uses.begin(), Uses.end(), Defs.begin(), Defs.end(),
                         std::back_inserter(ExternalUses));
 
-    if (llvm::isCurrentDebugType(DEBUG_TYPE)) {
+    if (Logger::isDebugEnabled()) {
       for (auto *F : Uses) {
-          printDebugDecl("Uses", F);
+          Logger::logDebugDecl("Uses", F);
       }
       for (auto *F : Defs) {
-          printDebugDecl("Defs", F);
+          Logger::logDebugDecl("Defs", F);
       }
     }
 
     for (auto *F : ExternalUses) {
-      printDebugDecl("ExternalUses", F);
+      Logger::logDebugDecl("ExternalUses", F);
       std::string USR;
       if (!getUSRForDecl(F, USR))
         continue;
-      printDebugDecl("ExternalUses", F, "USR: " + USR);
+      Logger::logDebugDecl("ExternalUses", F, "USR: " + USR);
       auto it_inserted = AllDecls.emplace(std::move(USR), DefInfo{nullptr, 1});
       if (!it_inserted.second) {
         it_inserted.first->second.Uses++;
@@ -168,7 +177,7 @@ public:
       assert(FD);
     }
 
-    printDebugDecl(FD);
+    Logger::logDebugDecl(FD);
 
     Uses.insert(FD->getCanonicalDecl());
   }
@@ -203,7 +212,7 @@ public:
       if (F->isMain())
         return;
 
-      printDebugDecl(F);
+      Logger::logDebugDecl(F);
 
       Defs.insert(F->getCanonicalDecl());
 
